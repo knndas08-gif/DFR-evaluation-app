@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFR 푸드테크 평가 모델 (2차)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #3b82f6;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col justify-center items-center py-10">
+
+    <div class="max-w-2xl w-full mx-auto bg-white rounded-2xl shadow-xl overflow-hidden relative">
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-center text-white">
+            <h1 class="text-2xl font-bold tracking-tight">DFR 평가 모델 <span class="text-blue-200 text-sm align-top">v2.0</span></h1>
+            <p class="text-blue-100 mt-2 text-sm">뇌 보상계 자극도 및 초가공식품 기반 위험도 분석 시스템 (푸드테크)</p>
+        </div>
+
+        <!-- Input Form Section -->
+        <div id="formSection" class="p-8 fade-in">
+            <div class="flex justify-center mb-6 space-x-3">
+                <button id="tabManual" onclick="switchTab('manual')" class="px-6 py-2 rounded-full font-semibold bg-blue-600 text-white shadow-md transition-all">직접 입력</button>
+                <button id="tabPhoto" onclick="switchTab('photo')" class="px-6 py-2 rounded-full font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all">사진 첨부 (AI 추출)</button>
+            </div>
+
+            <div id="photoSection" class="hidden mb-6 fade-in">
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                    <div id="uploadPlaceholder">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p class="text-sm text-gray-700 font-semibold">영양성분표 사진 업로드</p>
+                        <p class="mt-1 text-xs text-gray-500">클릭하여 이미지를 선택하세요</p>
+                    </div>
+                    <img id="imagePreview" class="hidden mx-auto max-h-48 rounded-lg shadow-sm" />
+                </div>
+                
+                <div id="ocrLoading" class="hidden mt-4 text-center text-blue-600 text-sm font-semibold flex items-center justify-center gap-2">
+                    <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    AI가 영양성분을 분석하고 있습니다...
+                </div>
+                <div id="ocrMessage" class="hidden mt-4 p-3 rounded-lg text-sm text-center"></div>
+            </div>
+
+            <p id="inputDesc" class="mb-4 text-sm text-gray-500 text-center font-medium">분석할 식품의 1회 제공량 기준 영양 정보를 직접 입력해주세요.</p>
+            
+            <div class="space-y-5">
+                <!-- Food Name -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">식품명</label>
+                    <input type="text" id="foodName" placeholder="예: 몬스터 에너지 드링크" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                </div>
+
+                <!-- Nutritional Inputs Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">당류 (g)</label>
+                        <input type="number" id="sugar" placeholder="0" min="0" step="0.1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">포화지방 (g)</label>
+                        <input type="number" id="fat" placeholder="0" min="0" step="0.1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">나트륨 (mg)</label>
+                        <input type="number" id="sodium" placeholder="0" min="0" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">NOVA 가공 단계</label>
+                        <select id="nova" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition bg-white">
+                            <option value="1">1단계 (미가공/최소 가공)</option>
+                            <option value="2">2단계 (조리 재료)</option>
+                            <option value="3">3단계 (가공 식품)</option>
+                            <option value="4">4단계 (초가공 식품)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Caffeine Checkbox -->
+                <div class="mt-4 p-4 bg-red-50 rounded-lg border border-red-100 flex items-start gap-3">
+                    <div class="flex items-center h-5">
+                        <input id="caffeine" type="checkbox" class="w-5 h-5 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500">
+                    </div>
+                    <div class="text-sm">
+                        <label for="caffeine" class="font-semibold text-red-900 cursor-pointer">고카페인 함유 여부 (식약처 기준)</label>
+                        <p class="text-red-700 mt-1">카페인 15mg 이상 함유 등 고카페인 표시 대상인 경우 체크하세요.</p>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button onclick="processData()" class="w-full mt-6 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all">
+                    위험도 분석 시작
+                </button>
+            </div>
+        </div>
+
+        <!-- Warning / Loading Section -->
+        <div id="loadingSection" class="hidden p-10 flex-col items-center justify-center text-center bg-gray-900 text-white fade-in min-h-[400px]">
+            <div class="spinner mb-6"></div>
+            <h2 class="text-2xl font-bold mb-4 text-red-400">⚠️ 분석 중...</h2>
+            <p class="text-lg leading-relaxed text-gray-300 font-light max-w-lg mx-auto">
+                "당류, 지방, 나트륨의 극단적 조합과 정제된 초가공식품은<br>
+                단순한 열량 과다를 넘어 청소년의 <strong>뇌 보상계</strong>를 교란하고<br> 
+                <strong>중추신경계</strong>를 과자극하여 중독적 섭취를 유발할 수 있습니다."
+            </p>
+            <p class="text-sm text-gray-500 mt-8">입력된 데이터를 바탕으로 알고리즘을 연산하고 있습니다...</p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="hidden p-8 fade-in bg-gray-50">
+            <div class="text-center mb-6">
+                <h2 id="resFoodName" class="text-xl font-semibold text-gray-600 mb-2">식품명</h2>
+                <div id="gradeBadge" class="inline-block px-8 py-3 rounded-full text-3xl font-extrabold text-white shadow-lg mb-2">
+                    A 등급
+                </div>
+                <p id="gradeDesc" class="text-lg font-medium text-gray-700"></p>
+                <div class="text-4xl font-bold text-gray-900 mt-4">
+                    <span id="finalScore">0.00</span> <span class="text-lg font-normal text-gray-500">/ 5.00 점</span>
+                </div>
+            </div>
+
+            <!-- Detailed Scores Breakdown -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                <h3 class="font-semibold text-gray-800 mb-4 border-b pb-2">1단계: 성별/가공도 분석 점수</h3>
+                <div class="grid grid-cols-4 gap-2 text-center text-sm">
+                    <div class="p-2 bg-blue-50 rounded"><span class="block text-gray-500 text-xs mb-1">당류(0.3)</span><span id="scoreSugar" class="font-bold text-lg">0</span>점</div>
+                    <div class="p-2 bg-blue-50 rounded"><span class="block text-gray-500 text-xs mb-1">포화지방(0.2)</span><span id="scoreFat" class="font-bold text-lg">0</span>점</div>
+                    <div class="p-2 bg-blue-50 rounded"><span class="block text-gray-500 text-xs mb-1">나트륨(0.2)</span><span id="scoreSodium" class="font-bold text-lg">0</span>점</div>
+                    <div class="p-2 bg-blue-50 rounded"><span class="block text-gray-500 text-xs mb-1">초가공(0.3)</span><span id="scoreNova" class="font-bold text-lg">0</span>점</div>
+                </div>
+                <div class="mt-3 text-right text-sm text-gray-600 font-medium">
+                    기본 위험 점수(TRS_base): <span id="baseScore" class="text-gray-900">0.00</span> 점
+                </div>
+            </div>
+
+            <!-- Penalties -->
+            <div class="bg-red-50 rounded-xl border border-red-100 p-5 mb-6">
+                <h3 class="font-semibold text-red-800 mb-3 border-b border-red-200 pb-2">2단계: 고위험 요인 패널티</h3>
+                <ul class="text-sm space-y-2 text-red-700" id="penaltyList">
+                    <!-- Penalties dynamically injected here -->
+                </ul>
+            </div>
+
+            <button onclick="resetApp()" class="w-full bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-4 border border-gray-300 rounded-lg shadow-sm transition-all">
+                다시 분석하기
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(mode) {
+            const tabManual = document.getElementById('tabManual');
+            const tabPhoto = document.getElementById('tabPhoto');
+            const photoSection = document.getElementById('photoSection');
+            const inputDesc = document.getElementById('inputDesc');
+
+            if (mode === 'manual') {
+                tabManual.className = "px-6 py-2 rounded-full font-semibold bg-blue-600 text-white shadow-md transition-all";
+                tabPhoto.className = "px-6 py-2 rounded-full font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all";
+                photoSection.classList.add('hidden');
+                inputDesc.innerText = "분석할 식품의 1회 제공량 기준 영양 정보를 직접 입력해주세요.";
+            } else {
+                tabManual.className = "px-6 py-2 rounded-full font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all";
+                tabPhoto.className = "px-6 py-2 rounded-full font-semibold bg-blue-600 text-white shadow-md transition-all";
+                photoSection.classList.remove('hidden');
+                inputDesc.innerText = "영양성분표를 업로드하면 AI가 당류, 지방, 나트륨을 자동 추출합니다.";
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // UI 초기화 및 미리보기
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+                const imgPreview = document.getElementById('imagePreview');
+                imgPreview.src = e.target.result;
+                imgPreview.classList.remove('hidden');
+                
+                // Base64 데이터 추출하여 AI 요청
+                const base64Data = e.target.result.split(',')[1];
+                extractNutritionInfo(base64Data);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function extractNutritionInfo(base64Data) {
+            document.getElementById('ocrLoading').classList.remove('hidden');
+            document.getElementById('ocrMessage').classList.add('hidden');
+            
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: "이 영양성분표 이미지에서 1회 제공량 기준 '당류(g)', '포화지방(g)', '나트륨(mg)' 값을 추출해줘." },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            sugar: { type: "NUMBER", description: "당류 함량(g)" },
+                            fat: { type: "NUMBER", description: "포화지방 함량(g)" },
+                            sodium: { type: "NUMBER", description: "나트륨 함량(mg)" }
+                        }
+                    }
+                }
+            };
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                document.getElementById('ocrLoading').classList.add('hidden');
+
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    const parsed = JSON.parse(text);
+                    
+                    // 추출된 값 폼에 자동 입력
+                    document.getElementById('sugar').value = parsed.sugar !== undefined ? parsed.sugar : 0;
+                    document.getElementById('fat').value = parsed.fat !== undefined ? parsed.fat : 0;
+                    document.getElementById('sodium').value = parsed.sodium !== undefined ? parsed.sodium : 0;
+                    
+                    const msg = document.getElementById('ocrMessage');
+                    msg.className = "mt-4 p-3 rounded-lg text-sm text-center bg-green-50 text-green-700 border border-green-200 fade-in";
+                    msg.innerHTML = "✅ <strong>AI 영양성분 추출 완료!</strong><br/>추출된 값을 확인하고 식품명과 나머지 항목을 마저 선택해주세요.";
+                    msg.classList.remove('hidden');
+                } else {
+                    throw new Error("No candidates found");
+                }
+            } catch (error) {
+                document.getElementById('ocrLoading').classList.add('hidden');
+                const msg = document.getElementById('ocrMessage');
+                msg.className = "mt-4 p-3 rounded-lg text-sm text-center bg-red-50 text-red-700 border border-red-200 fade-in";
+                msg.innerHTML = "❌ 이미지에서 영양성분을 명확히 인식하지 못했습니다. 선명한 사진을 올리거나 직접 입력해주세요.";
+                msg.classList.remove('hidden');
+                console.error("OCR Error:", error);
+            }
+        }
+
+        // 1. Scoring Logic based on criteria
+        function getSugarScore(val) {
+            if (val <= 2) return 1;
+            if (val <= 6) return 2;
+            if (val <= 10) return 3;
+            if (val <= 15) return 4;
+            return 5;
+        }
+
+        function getFatScore(val) {
+            if (val <= 1) return 1;
+            if (val <= 2) return 2;
+            if (val <= 3.5) return 3;
+            if (val <= 5) return 4;
+            return 5;
+        }
+
+        function getSodiumScore(val) {
+            if (val <= 120) return 1;
+            if (val <= 240) return 2;
+            if (val <= 400) return 3;
+            if (val <= 600) return 4;
+            return 5;
+        }
+
+        function getNovaScore(val) {
+            if (val === 1) return 1;
+            if (val === 2) return 2;
+            if (val === 3) return 4; // NOVA 3단계는 4점
+            return 5; // NOVA 4단계는 5점
+        }
+
+        // 2. Main Process Function
+        function processData() {
+            // Retrieve Inputs
+            const name = document.getElementById('foodName').value || '이름 미상 식품';
+            const sugar = parseFloat(document.getElementById('sugar').value) || 0;
+            const fat = parseFloat(document.getElementById('fat').value) || 0;
+            const sodium = parseFloat(document.getElementById('sodium').value) || 0;
+            const nova = parseInt(document.getElementById('nova').value);
+            const isHighCaffeine = document.getElementById('caffeine').checked;
+
+            // Hide Form, Show Loading
+            document.getElementById('formSection').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+
+            // Simulate AI/Algorithm Processing Time (3.5 seconds to read the warning)
+            setTimeout(() => {
+                calculateAndShowResult(name, sugar, fat, sodium, nova, isHighCaffeine);
+            }, 3500);
+        }
+
+        // 3. Algorithm Calculation & Display
+        function calculateAndShowResult(name, sugar, fat, sodium, nova, isHighCaffeine) {
+            // Get individual scores
+            const sScore = getSugarScore(sugar);
+            const fScore = getFatScore(fat);
+            const nScore = getSodiumScore(sodium);
+            const pScore = getNovaScore(nova);
+
+            // Calculate Base Score (TRS_base)
+            const trsBase = (sScore * 0.3) + (pScore * 0.3) + (fScore * 0.2) + (nScore * 0.2);
+
+            // Calculate Penalties
+            let penaltyTotal = 0;
+            let penaltyHTML = '';
+
+            if (isHighCaffeine) {
+                penaltyTotal += 0.8;
+                penaltyHTML += `<li>🚨 <strong>+0.8점</strong> : 식약처 기준 고카페인 해당 (중추신경계 자극)</li>`;
+            }
+
+            // Extreme Penalty: Any score == 5 AND Nova == 4
+            if ((sScore === 5 || fScore === 5 || nScore === 5) && nova === 4) {
+                penaltyTotal += 0.5;
+                penaltyHTML += `<li>🚨 <strong>+0.5점</strong> : 극단적 위험 성분 보유 및 초가공식품 (뇌 보상계 중복 교란)</li>`;
+            }
+
+            if (penaltyTotal === 0) {
+                penaltyHTML = `<li class="text-gray-500">발견된 고위험 패널티 항목이 없습니다.</li>`;
+            }
+
+            // Calculate Final Score (Max 5.0)
+            let trsFinal = trsBase + penaltyTotal;
+            if (trsFinal > 5.0) trsFinal = 5.0;
+
+            // Determine Grade
+            let grade = '';
+            let gradeColor = '';
+            let gradeDesc = '';
+
+            if (trsFinal < 1.8) {
+                grade = 'A'; gradeColor = 'bg-green-500'; gradeDesc = '보상계 자극 매우 낮음 (가장 건강함)';
+            } else if (trsFinal < 2.6) {
+                grade = 'B'; gradeColor = 'bg-blue-500'; gradeDesc = '보상계 자극 낮음 (양호)';
+            } else if (trsFinal < 3.4) {
+                grade = 'C'; gradeColor = 'bg-yellow-500'; gradeDesc = '보상계 자극 보통 (주의 필요)';
+            } else if (trsFinal < 4.2) {
+                grade = 'D'; gradeColor = 'bg-orange-500'; gradeDesc = '높은 보상계 자극 (청소년 섭취 주의)';
+            } else {
+                grade = 'E'; gradeColor = 'bg-red-600'; gradeDesc = '고위험 (뇌 보상계 과도 자극 / 섭취 제한 권고)';
+            }
+
+            // Update UI Elements
+            document.getElementById('resFoodName').innerText = name;
+            
+            const badge = document.getElementById('gradeBadge');
+            badge.className = `inline-block px-8 py-3 rounded-full text-3xl font-extrabold text-white shadow-lg mb-2 ${gradeColor}`;
+            badge.innerText = `${grade} 등급`;
+            
+            document.getElementById('gradeDesc').innerText = gradeDesc;
+            document.getElementById('finalScore').innerText = trsFinal.toFixed(2);
+            
+            document.getElementById('scoreSugar').innerText = sScore;
+            document.getElementById('scoreFat').innerText = fScore;
+            document.getElementById('scoreSodium').innerText = nScore;
+            document.getElementById('scoreNova').innerText = pScore;
+            
+            document.getElementById('baseScore').innerText = trsBase.toFixed(2);
+            document.getElementById('penaltyList').innerHTML = penaltyHTML;
+
+            // Switch Views
+            document.getElementById('loadingSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+        }
+
+        // 4. Reset App
+        function resetApp() {
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('formSection').classList.remove('hidden');
+            
+            // 사진 첨부 UI 초기화
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('ocrMessage').classList.add('hidden');
+            
+            // Clear inputs optionally
+            // document.getElementById('foodName').value = '';
+            // document.getElementById('sugar').value = '';
+            // document.getElementById('fat').value = '';
+            // document.getElementById('sodium').value = '';
+            // document.getElementById('nova').value = '1';
+            // document.getElementById('caffeine').checked = false;
+        }
+    </script>
+</body>
+</html>
